@@ -13,7 +13,7 @@
 
 typedef unsigned char bool;
 
-typedef bool (*cmd_set_func)(char *arg_list);
+typedef bool (*cmd_set_func)(char *arg_list, uint8 arg_cnt);
 typedef bool (*cmd_get_func)(char *arg_list);
 
 
@@ -25,15 +25,54 @@ typedef struct cmd_pro_arch_s {
 
 }CMD_PRO_ARCH_T;
 
-void apn_set(char *arg_list)
+#define ACTUAL_ARG_OFFSET 2
+#define CMD_OK		"OK"
+#define CMD_ERROR	"ERROR"
+
+bool apn_set(char *arg_each, uint8 arg_cnt)
 {
-	char* arg_apn = arg_list;
-	strncpy(g_apn, arg_apn, strlen(arg_apn));
+	/* apn offset */
+	char* arg_list = arg_each + ACTUAL_ARG_OFFSET;
+
+	strncpy(g_apn, arg_list, strlen(arg_list));
+	if (strncmp(g_apn, arg_list, strlen(arg_list)))
+	{
+		printf("g_apn:%s\n", g_apn);
+		return FALSE;
+	}
+
+	/* if username and password specified */
+	if (arg_cnt == ACTUAL_ARG_OFFSET + 3)
+	{
+		arg_list++;
+		strncpy(g_apn_usrname, arg_list, strlen(arg_list));
+		if (strncmp(g_apn, arg_list, strlen(arg_list)))
+		{
+			printf("g_apn_usrname:%s\n", g_apn_usrname);
+			return FALSE;
+		}
+
+		arg_list++;
+		strncpy(a_apn_passwd, arg_list, strlen(arg_list));
+		if (strncmp(g_apn, arg_list, strlen(arg_list)))
+		{
+			printf("g_apn_usrname:%s\n", g_apn_usrname);
+			return FALSE;
+		}
+
+	}
+
+	return TRUE;
 }
 
 void apn_query()
 {
 	return g_apn;
+}
+
+void cmd_exe_and_chk()
+{
+	//if
 }
 
 void server_set()

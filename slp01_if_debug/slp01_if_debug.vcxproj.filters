@@ -35,5 +35,8 @@
     <ClInclude Include="if_server.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="if_mcu.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

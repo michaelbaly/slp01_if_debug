@@ -130,6 +130,7 @@
   <ItemGroup>
     <ClInclude Include="cmd_type.h" />
     <ClInclude Include="err_code.h" />
+    <ClInclude Include="if_mcu.h" />
     <ClInclude Include="if_server.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -2,7 +2,7 @@
 #define ATEL_DEBUG
 #define MAX_ARG_LEN 16
 #define MAX_ARG_NUM 30
-
+#define R_QUEUE_SIZE	40
 
 typedef enum {
 	QUERY_CMD_E = 0,
@@ -10,3 +10,4 @@ typedef enum {
 }CMD_TYPE_E;
 
 typedef unsigned char uint8;
+
