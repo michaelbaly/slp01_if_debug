@@ -1,43 +1,38 @@
 #include <stdio.h>
 #include "if_server.h"
 #include "cmd_type.h"
+#include "common.h"
 
 /* command process arch */
 
-/* begin: cmd register */
-#define TOTAL_CMD_NUM	34
-/* end */
-
-#define TRUE	1
-#define FALSE	0
-
-typedef unsigned char bool;
-
-typedef bool (*cmd_set_func)(char *arg_list, uint8 arg_cnt);
-typedef bool (*cmd_get_func)(char *arg_list);
 
 
-typedef struct cmd_pro_arch_s {
 
-	char* cmd_code;
-	cmd_set_func cmd_set_f;
-	cmd_get_func cmd_get_f;
 
-}CMD_PRO_ARCH_T;
+/* this contains apn/username/password */
+APN_INFO apn_info = { {0} };
 
-#define ACTUAL_ARG_OFFSET 2
-#define CMD_OK		"OK"
-#define CMD_ERROR	"ERROR"
 
-bool apn_set(char *arg_each, uint8 arg_cnt)
+void apn_info_init(APN_INFO *apn_data)
+{
+	strncpy(apn_data->apn, DFT_APN, strlen(DFT_APN));
+	strncpy(apn_data->apn_usrname, DFT_APN_USRNAME, strlen(DFT_APN_USRNAME));
+	strncpy(apn_data->apn_passwd, DFT_APN_PASSWD, strlen(DFT_APN_PASSWD));
+
+}
+
+bool apn_set(p_arg arg_each, uint8 arg_cnt)
 {
 	/* apn offset */
-	char* arg_list = arg_each + ACTUAL_ARG_OFFSET;
+	p_arg arg_list = arg_each + ACTUAL_ARG_OFFSET;
 
-	strncpy(g_apn, arg_list, strlen(arg_list));
-	if (strncmp(g_apn, arg_list, strlen(arg_list)))
+	/* clear apn info */
+	memset(&apn_info, 0, sizeof(apn_info));
+
+	strncpy(apn_info.apn, arg_list, strlen(arg_list));
+	if (strncmp(apn_info.apn, arg_list, strlen(arg_list)))
 	{
-		printf("g_apn:%s\n", g_apn);
+		printf("g_apn:%s\n", apn_info.apn);
 		return FALSE;
 	}
 
@@ -45,18 +40,18 @@ bool apn_set(char *arg_each, uint8 arg_cnt)
 	if (arg_cnt == ACTUAL_ARG_OFFSET + 3)
 	{
 		arg_list++;
-		strncpy(g_apn_usrname, arg_list, strlen(arg_list));
-		if (strncmp(g_apn, arg_list, strlen(arg_list)))
+		strncpy(apn_info.apn_usrname, arg_list, strlen(arg_list));
+		if (strncmp(apn_info.apn_usrname, arg_list, strlen(arg_list)))
 		{
-			printf("g_apn_usrname:%s\n", g_apn_usrname);
+			printf("apn_usrname:%s\n", apn_info.apn_usrname);
 			return FALSE;
 		}
 
 		arg_list++;
-		strncpy(a_apn_passwd, arg_list, strlen(arg_list));
-		if (strncmp(g_apn, arg_list, strlen(arg_list)))
+		strncpy(apn_info.apn_passwd, arg_list, strlen(arg_list));
+		if (strncmp(apn_info.apn_passwd, arg_list, strlen(arg_list)))
 		{
-			printf("g_apn_usrname:%s\n", g_apn_usrname);
+			printf("apn_passwd:%s\n", apn_info.apn_passwd);
 			return FALSE;
 		}
 
@@ -65,15 +60,26 @@ bool apn_set(char *arg_each, uint8 arg_cnt)
 	return TRUE;
 }
 
-void apn_query()
+bool apn_query(APN_INFO *apn_data)
 {
-	return g_apn;
+	APN_INFO* apn_tmp = apn_data;
+
+	/* apn info valid ? */
+	if (!strlen(apn_info.apn) || (!strlen(apn_info.apn_usrname) && !strlen(apn_info.apn_passwd)))
+	{
+		/* apn info invalid */
+		return FALSE;
+	}
+
+	/* fill mem of apn_data */
+	strncpy(apn_tmp->apn, apn_info.apn, strlen(apn_info.apn));
+	strncpy(apn_tmp->apn_usrname, apn_info.apn_usrname, strlen(apn_info.apn_usrname));
+	strncpy(apn_tmp->apn_passwd, apn_info.apn_passwd, strlen(apn_info.apn_passwd));
+
+
+	return TRUE;
 }
 
-void cmd_exe_and_chk()
-{
-	//if
-}
 
 void server_set()
 {
@@ -85,7 +91,12 @@ void server_query()
 
 }
 
-static CMD_PRO_ARCH_T cmd_pro_reg[TOTAL_CMD_NUM] = {
+bool getadc(status)
+{
+	return FALSE;
+}
+
+CMD_PRO_ARCH_T cmd_pro_reg[TOTAL_CMD_NUM] = {
 
 	/* APN */
 	{.cmd_code = "APN",.cmd_set_f = apn_set,.cmd_get_f = apn_query },
@@ -103,7 +114,7 @@ static CMD_PRO_ARCH_T cmd_pro_reg[TOTAL_CMD_NUM] = {
 	{.cmd_code = "PDNTYPE",.cmd_set_f = apn_set,.cmd_get_f = apn_query },
 	{.cmd_code = "FACTORYRESET", .cmd_set_f = server_set, .cmd_get_f = NULL},
 	{.cmd_code = "OTASTART",.cmd_set_f = apn_set,.cmd_get_f = NULL },
-	{.cmd_code = "GETADC", .cmd_set_f = NULL, .cmd_get_f = server_query},
+	{.cmd_code = "GETADC", .cmd_set_f = NULL, .cmd_get_f = getadc},
 	{.cmd_code = "REPORT",.cmd_set_f = NULL,.cmd_get_f = apn_query },
 	{.cmd_code = "HEARTBEAT", .cmd_set_f = server_set, .cmd_get_f = server_query},
 	{.cmd_code = "GEOFENCE",.cmd_set_f = apn_set,.cmd_get_f = apn_query },
@@ -128,6 +139,7 @@ static CMD_PRO_ARCH_T cmd_pro_reg[TOTAL_CMD_NUM] = {
 bool cmd_match(char* cmd_code, unsigned char *index)
 {
 	int i = 0;
+
 	for (; i < TOTAL_CMD_NUM; ++i)
 	{
 		if (!strncmp(cmd_code, cmd_pro_reg[i].cmd_code))

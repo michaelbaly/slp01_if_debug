@@ -64,17 +64,17 @@ void dequeue()
 		return;
 	}
 	/* send packet via the socket */
-	send_packet(sfd, rq.p_ack[rq.front]);
+	//send_packet(sfd, rq.p_ack[rq.front]);
 
 	/* release packet buffer */
 
 	/* move head pointer to next */
-	rq.front = (rq.front + 1) % R_QUEUE_SIZE
+	rq.front = (rq.front + 1) % R_QUEUE_SIZE;
 }
 
 
 // interface func
-uint8 para_cmd_str(char* cmd_str, char (*arg_list)[MAX_ARG_LEN], CMD_TYPE_E *c_type)
+uint8 para_cmd_str(char* cmd_str, p_arg arg_list, CMD_TYPE_E *c_type)
 {
 	char* cmd_tmp = cmd_str;
 	char* arg_start = NULL;
@@ -83,16 +83,7 @@ uint8 para_cmd_str(char* cmd_str, char (*arg_list)[MAX_ARG_LEN], CMD_TYPE_E *c_t
 #ifdef ATEL_DEBUG
 		printf("[cmd from server] %s\n", cmd_str);
 #endif
-#if 0
-	if ('?' == *(cmd_tmp + strlen(cmd_tmp) - 1))
-	{
-		*c_type = QUERY_CMD_E;
-	}
-	else if ('#' == *(cmd_tmp + strlen(cmd_tmp) - 1)) 
-	{
-		*c_type = SET_CMD_E;
-	}
-#endif
+
 	/* parase the count of parameters */
 	while (NULL != cmd_tmp)
 	{

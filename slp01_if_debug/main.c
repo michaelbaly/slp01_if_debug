@@ -4,47 +4,27 @@
 #include "if_server.h"
 #include "err_code.h"
 #include "cmd_type.h"
+#include "common.h"
 
 
 
-const char cmd_set[] = "APN,000000,iot.nb,michael,138114#";
-const char cmd_query[] = "APN,000000?";
+extern APN_INFO apn_info;
+extern CMD_PRO_ARCH_T cmd_pro_reg[];
 
-#define SYS_DEFAULT_PASSWD	"123456"
-#define SYS_PASSWD_MAX_LEN	6
+const char cmd_set[] = "APN,123456,iot.nb,michael,138114#";
+const char cmd_query[] = "APN,123456?";
 
-#define APN_MAX_LEN		MAX_ARG_NUM
+static char g_sys_passwd[SYS_PASSWD_MAX_LEN+1] = SYS_DEFAULT_PASSWD;
+//extern cmd_pro_reg;
+static char ack_buffer[ACK_SET_LEN_MAX] = {0};
 
-char g_apn[MAX_ARG_LEN] = {0};
-char g_apn_usrname[MAX_ARG_LEN] = {0};
-char a_apn_passwd[MAX_ARG_LEN] = {0};
+char g_imei_buf[MAX_IMEI_LEN] = { 0 };
+char g_dev_name[MAX_DEV_LEN] = DFT_DEV_NAME;
+char g_real_time[MAX_RT_LEN] = { 0 };
 
-char g_sys_passwd[SYS_PASSWD_MAX_LEN+1] = SYS_DEFAULT_PASSWD;
-extern cmd_pro_reg;
+#define UNIT_TEST
 
-typedef struct apn_cmd_fmt_s {
-
-	char cmd_code[MAX_ARG_LEN];
-	char passwd[MAX_ARG_LEN];
-	char apn_name[MAX_ARG_LEN];
-	char usr_name[MAX_ARG_LEN];
-	char usr_passwd[MAX_ARG_LEN];
-
-}APN_CMD_FMT;
-
-#define ACK_PRE_LEN		4
-#define MAX_IMEI_LEN	20
-#define MAX_DEV_LEN		10
-#define MAX_ST_LEN		15
-
-#define ACK_PREFIX		"+ACK"
-#define RESP_PREFIX		"+RESP"
-#define BUFF_PREFIX		"+BUFF"
-#define SACK_PREFIX		"+SACK"
-#define ACK_SET_LEN_MAX		256
-
-char ack_buffer[ACK_SET_LEN_MAX];
-
+#ifndef ATEL_DEBUG
 /* common load */
 typedef struct com_load_ack
 {
@@ -153,11 +133,11 @@ typedef struct adc_ack_query
 }GADC_PACKET_Q;
 
 //+ACK:HEARTBEAT,<IMEI>,<device_name>,<status>,<send_time>,<minute>#
-typedef struct adc_ack_query
+typedef struct hb_ack_query
 {
 	COMMON_LOAD com_load;
 	char min[MAX_ARG_LEN];
-}GADC_PACKET_Q;
+}HB_PACKET_Q;
 
 //+ACK:OUTPUT,<IMEI>,<device_name>,<status>,<send_time>,<index>,<level>#
 typedef struct d_out_ack_query
@@ -196,43 +176,143 @@ typedef struct wdog_ack_query
 	char day[DEF_D_LEN];
 }WDOG_PACKET_Q;
 
+#endif
 
 
+/* obtain IMEI info through api */
+char* atel_get_imei()
+{
+
+	/* return the addr which contains imei info */
+	//return g_imei_buf;
+	return "866425037710391";
+	
+}
+
+char* atel_get_dname()
+{
+	//return g_dev_name;
+	return DFT_DEV_NAME;
+}
+
+char* atel_get_real_time()
+{
+	//return g_real_time;
+	return "20190820171650";
+}
 
 /* build the packet based on cmd and cmd type */
-void build_ack(uint8 cmd_index, bool cmd_type, bool status)
+void build_ack(uint8 cmd_idx, bool cmd_type, bool status, void * cmd_rel_s)
 {
+	char* p_ack = ack_buffer;
+	char* p_imei = NULL;
+	char* p_dev_name = NULL;
+	char* p_real_time = NULL;
+	int use_len = 0;
+
+	APN_INFO *cmd_rel_tmp = (APN_INFO*)cmd_rel_s;
 	/* cmd_type(set:1;query:0) */
 	//+ACK:APN,<IMEI>,<device_name>,<status>,<send_time>#
-	//strcpy(com_ack.ack_prefix,);
-	memset(ack_buffer, '\0', sizeof(ack_buffer));
-	strncpy(ack_buffer, ACK_PREFIX, ACK_PRE_LEN);
-	strcat(ack_buffer + ACK_PRE_LEN, ":");
-	strcat(ack_buffer + ACK_PRE_LEN, cmd_pro_reg[cmd_index].cmd_code);//arg_list[0] = APN or cmd_pro_reg[index].cmd_code
+
+	memset(ack_buffer, 0, sizeof(ack_buffer));
+
+#ifndef ATEL_DEBUG
+	strcat_s(p_ack, ACK_PRE_LEN, ACK_PREFIX);
+	p_ack += ACK_PRE_LEN;
+	strcat_s(p_ack, 1, ":");
+	p_ack += 1;
+	strcat_s(p_ack, strlen(cmd_pro_reg[cmd_idx].cmd_code), cmd_pro_reg[cmd_idx].cmd_code);//arg_list[0] = APN or cmd_pro_reg[index].cmd_code
+	p_ack += strlen(cmd_pro_reg[cmd_idx].cmd_code);
+	strcat_s(p_ack, 1, ",");
+	p_ack += 1;
 	//get imei by using api via the atc pipe
+	p_imei = atel_get_imei();
+	strcat_s(p_ack, strlen(p_imei), p_imei);
+	p_ack += strlen(p_imei);
 
 	//get device name
+	p_dev_name = atel_get_dname();
+	strcat_s(p_ack, strlen(p_dev_name), p_dev_name);
+	p_ack += strlen(p_dev_name);
 
 	//get status from execute result in switch case
 	if (status)
 	{
 		//cat "OK" with ack_buffer
+		strcat_s(p_ack, 2, "OK");
+		p_ack += strlen("OK");
+
 	}
 	else
 	{
 		//cat "ERROR" with ack_buffer
+		strcat_s(p_ack, 5, "ERROR");
+		p_ack += strlen("ERROR");
+
 	}
 
 	//get current time and cat with ack_buffer
+	p_real_time = atel_get_real_time();
+	strcat_s(p_ack, strlen(p_real_time), p_real_time);
+	p_ack += strlen(p_real_time);
+
 
 	/* if cmd_type is query */
 	if (!cmd_type)
 	{
+		strcat_s(p_ack, 1, ",");
+		p_ack += 1;
 		//cat each paras with ack_buffer
+
 	}
 
+	/* add ack terminator char */
+	strcat_s(p_ack, 1, "#");
+#endif
+
+	//compound ack
+	p_imei = atel_get_imei();
+	p_dev_name = atel_get_dname();
+	p_real_time = atel_get_real_time();
+	//sprintf_s(ack_buffer, sizeof(ack_buffer), "+ACK:%s,%s,%s,%s,%s%s", cmd_pro_reg[cmd_idx].cmd_code, p_imei, p_dev_name, "OK", p_real_time,"#");
+	sprintf_s(ack_buffer, sizeof(ack_buffer), "+ACK:%s,%s,%s,%s", cmd_pro_reg[cmd_idx].cmd_code, p_imei, p_dev_name, p_real_time);
+	use_len += strlen(ack_buffer);
+
+	/* attach execution status */
+	if (status)
+	{
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", EXEC_STATUS_OK);
+		use_len += strlen(EXEC_STATUS_OK) + 1;
+	}
+	else
+	{
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", EXEC_STATUS_ERROR);
+		use_len += strlen(EXEC_STATUS_ERROR) + 1;
+	}
+
+	/* if cmd_type is query */
+	if (!cmd_type)
+	{
+		/* extract each mem from the struct */
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", cmd_rel_tmp->apn);
+		use_len += strlen(cmd_rel_tmp->apn) + 1;
+
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", cmd_rel_tmp->apn_usrname);
+		use_len += strlen(cmd_rel_tmp->apn_usrname) + 1;
+
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", cmd_rel_tmp->apn_passwd);
+		use_len += strlen(cmd_rel_tmp->apn_passwd) + 1;
+
+	}
+	/* attch terminiter charactor */
+	sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, "%s", "#");
+	use_len += 1;
+
+
+	printf("cnt of ack_buffer:%s\nthe use_len is:%d\n", ack_buffer, use_len);
+
 	/* send ack to server through socket */
-	send_packet();
+	//send_packet(sfd, ack_buffer);
 }
 
 /* enqueue the packet */
@@ -245,13 +325,29 @@ void send_packet(sockfd, packet)
 void apn_info_show()
 {
 	printf("the apn info:\n");
-	printf("g_apn:%s\n", g_apn);
-	printf("g_apn_usrname:%s\n", g_apn_usrname);
-	printf("g_apn_usrname:%s\n", g_apn_usrname);
+	printf("apn:%s\n", apn_info.apn);
+	printf("apn_usrname:%s\n", apn_info.apn_usrname);
+	printf("apn_passwd:%s\n", apn_info.apn_passwd);
 
 	return;
 }
 
+
+void cmd_rel_data_parse(char *cmd_code, CMD_CODE_E index_e)
+{
+	/* judge data type */
+	switch (index_e)
+	{
+		case GADC_E:
+
+			break;
+
+		default:
+			break;
+	}
+
+	return;
+}
 
 int main()
 {
@@ -261,9 +357,13 @@ int main()
 	uint8 index = 0xff;
 	char arg_list[MAX_ARG_NUM][MAX_ARG_LEN] = { 0 };
 	CMD_TYPE_E cmd_type = 0xff;
-	COMMON_LOAD com_ack;
+	//COMMON_LOAD com_ack;
+	//APN_INFO apn_tmp;
+	//CMD_PRO_ARCH_T* p_cmd = &cmd_pro_reg[0];
 
-	char* arg_each = &arg_list[0];
+	APN_INFO apn_data = { {0} };
+
+	p_arg arg_each = NULL;
 
 
 	memset(arg_list, 0, sizeof(arg_list));
@@ -280,7 +380,7 @@ int main()
 	/* compound each arg for different use */
 
 	/* return if password is invalid */
-	if (!cmd_match(arg_list[0], index) && strncmp(g_sys_passwd, arg_list[1], SYS_PASSWD_MAX_LEN))
+	if (!cmd_match(arg_list[0], &index) || strncmp(g_sys_passwd, arg_list[1], SYS_PASSWD_MAX_LEN))
 	{
 		printf("error cmd or password!\n");
 		return ERROR_CMD_PWD_E;
@@ -291,12 +391,13 @@ int main()
 	{
 		case QUERY_CMD_E:
 			/* execute the registered query function */
-			status = cmd_pro_reg[index].cmd_get_f(arg_each);
+			//status = cmd_pro_reg[index].cmd_get_f(&status);
 			break;
 
 		case SET_CMD_E:
 			/* execute the registered set function */
-			status = cmd_pro_reg[index].cmd_set_f(arg_each);
+			arg_each = arg_list[0];
+			status = cmd_pro_reg[index].cmd_set_f(arg_each, arg_cnt);
 			break;
 
 		default:
@@ -310,12 +411,58 @@ int main()
 	/* apn info */
 	apn_info_show();
 
-	/* build apn set ack */
+	/* query result test */
+#ifdef UNIT_TEST
+	memset(arg_list, 0, sizeof(arg_list));
+	arg_cnt = para_cmd_str(cmd_query, arg_list, &cmd_type);
+
+	printf("cmd_type: %d\n", cmd_type);
+	printf("arg_cnt: %d\n", arg_cnt);
+
+	for (; i < arg_cnt; i++)
+	{
+		printf("arg_list[arg_cnt]: %s\n", *(arg_list + i));
+	}
+
+	/* compound each arg for different use */
+
+	/* return if password is invalid */
+	if (!cmd_match(arg_list[0], &index) || strncmp(g_sys_passwd, arg_list[1], SYS_PASSWD_MAX_LEN))
+	{
+		printf("error cmd or password!\n");
+		return ERROR_CMD_PWD_E;
+	}
+
+	/* continue the flow */
+	switch (cmd_type)
+	{
+		case QUERY_CMD_E:
+			/* execute the registered query function */
+			status = cmd_pro_reg[index].cmd_get_f((void*)&apn_data);
+			break;
+
+		case SET_CMD_E:
+			/* execute the registered set function */
+			arg_each = arg_list[0];
+			status = cmd_pro_reg[index].cmd_set_f(arg_each, arg_cnt);
+			break;
+
+		default:
+		{
+			printf("unknown command type\n");
+			break;
+		}
+
+	}
+
+#endif
+
+	/* build ack for server */
+	build_ack(index, cmd_type, status, (void*)&apn_data);
+
+	//enqueue the ack
 	
-
-
-
-
+	
 	return 0;
 
 }
