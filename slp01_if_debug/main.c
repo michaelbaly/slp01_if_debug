@@ -315,6 +315,72 @@ void build_ack(uint8 cmd_idx, bool cmd_type, bool status, void * cmd_rel_s)
 	//send_packet(sfd, ack_buffer);
 }
 
+
+/* version 2 for build ack */
+/* build the packet based on cmd and cmd type */
+void build_ack_v2(uint8 cmd_idx, bool cmd_type, bool status, void* cmd_rel_s)
+{
+	char* p_ack = ack_buffer;
+	char* p_imei = NULL;
+	char* p_dev_name = NULL;
+	char* p_real_time = NULL;
+	int use_len = 0;
+	int i = 0;
+
+
+	/* aquery struct type */
+	p_arg cmd_rel_tmp = (p_arg*)cmd_rel_s;
+	/* cmd_type(set:1;query:0) */
+	//+ACK:APN,<IMEI>,<device_name>,<status>,<send_time>#
+
+	memset(ack_buffer, 0, sizeof(ack_buffer));
+	//compound ack
+	p_imei = atel_get_imei();
+	p_dev_name = atel_get_dname();
+	p_real_time = atel_get_real_time();
+	//sprintf_s(ack_buffer, sizeof(ack_buffer), "+ACK:%s,%s,%s,%s,%s%s", cmd_pro_reg[cmd_idx].cmd_code, p_imei, p_dev_name, "OK", p_real_time,"#");
+	sprintf_s(ack_buffer, sizeof(ack_buffer), "+ACK:%s,%s,%s,%s", cmd_pro_reg[cmd_idx].cmd_code, p_imei, p_dev_name, p_real_time);
+	use_len += strlen(ack_buffer);
+
+	/* attach execution status */
+	if (status)
+	{
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", EXEC_STATUS_OK);
+		use_len += strlen(EXEC_STATUS_OK) + 1;
+	}
+	else
+	{
+		sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", EXEC_STATUS_ERROR);
+		use_len += strlen(EXEC_STATUS_ERROR) + 1;
+	}
+
+	/* if cmd_type is query */
+	if (!cmd_type)
+	{
+		/* extract each mem from the struct */
+
+		/* fill mem of struct pointer */
+		for (; i < cmd_pro_reg[cmd_idx].ele_num; i++)
+		{
+			sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, ",%s", cmd_rel_tmp);
+			use_len += strlen(cmd_rel_tmp) + 1;
+			cmd_rel_tmp++;
+		}
+
+	}
+	/* attch terminiter charactor */
+	sprintf_s(ack_buffer + use_len, sizeof(ack_buffer) - use_len, "%s", "#");
+	use_len += 1;
+
+
+	printf("cnt of ack_buffer:%s\nthe use_len is:%d\n", ack_buffer, use_len);
+
+	/* send ack to server through socket */
+	//send_packet(sfd, ack_buffer);
+}
+
+/* end */
+
 /* enqueue the packet */
 void send_packet(sockfd, packet)
 {
@@ -333,13 +399,13 @@ void apn_info_show()
 }
 
 
-void cmd_rel_data_parse(char *cmd_code, CMD_CODE_E index_e)
+void get_data_type(char *cmd_code, CMD_CODE_E index_e)
 {
 	/* judge data type */
 	switch (index_e)
 	{
-		case GADC_E:
-
+		case APN_E:
+			return ;
 			break;
 
 		default:
@@ -348,6 +414,7 @@ void cmd_rel_data_parse(char *cmd_code, CMD_CODE_E index_e)
 
 	return;
 }
+
 
 int main()
 {
@@ -358,12 +425,15 @@ int main()
 	char arg_list[MAX_ARG_NUM][MAX_ARG_LEN] = { 0 };
 	CMD_TYPE_E cmd_type = 0xff;
 	//COMMON_LOAD com_ack;
-	//APN_INFO apn_tmp;
-	//CMD_PRO_ARCH_T* p_cmd = &cmd_pro_reg[0];
-
 	APN_INFO apn_data = { {0} };
-
 	p_arg arg_each = NULL;
+
+#ifndef ATEL_DEBUG
+	APN_INFO_T apn_tmp;
+
+	apn_tmp.data_type->apn;
+
+#endif
 
 
 	memset(arg_list, 0, sizeof(arg_list));
@@ -433,12 +503,18 @@ int main()
 		return ERROR_CMD_PWD_E;
 	}
 
+#ifdef ATEL_DEBUG
+	/* aquery the struct type */
+	
+#endif
+
 	/* continue the flow */
 	switch (cmd_type)
 	{
 		case QUERY_CMD_E:
 			/* execute the registered query function */
-			status = cmd_pro_reg[index].cmd_get_f((void*)&apn_data);
+			//status = cmd_pro_reg[index].cmd_get_f((void*)&apn_data);
+			status = cmd_pro_reg[index].cmd_get_f(cmd_pro_reg[index].cmd_rel_st);
 			break;
 
 		case SET_CMD_E:
@@ -458,7 +534,8 @@ int main()
 #endif
 
 	/* build ack for server */
-	build_ack(index, cmd_type, status, (void*)&apn_data);
+	//build_ack(index, cmd_type, status, (void*)&apn_data);
+	build_ack_v2(index, cmd_type, status, cmd_pro_reg[index].cmd_rel_st);
 
 	//enqueue the ack
 	
